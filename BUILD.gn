@@ -44,3 +44,15 @@ source_set("native_buffer_export") {
   public_deps = [ ":dma_heap" ]
   cflags_cc = [ "-std=c++17" ]
 }
+
+source_set("vulkan_buffer_allocator") {
+  sources = [ "display/memory/vulkan_buffer_allocator.cpp" ]
+  public = [ "include/qcom/vulkan_buffer_allocator.h" ]
+  public_deps = [ ":native_buffer_export" ]
+  include_dirs = [
+    "//third_party/vulkan-headers/include",
+    "//drivers/peripheral/display/interfaces/include",
+  ]
+  libs = [ "dl" ]
+  cflags_cc = [ "-std=c++17" ]
+}

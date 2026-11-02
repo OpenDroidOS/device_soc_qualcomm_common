@@ -57,6 +57,28 @@ Consumers must validate the layout against their hardware, check the actual fd
 capacity and obey the existing fence/CPU-access ownership contract. The header
 dependency needs the native HDI, native-buffer format and DRM UAPI include paths.
 
+## Vulkan allocation
+
+Depend on `:vulkan_buffer_allocator` and initialize `VulkanBufferAllocator` with
+the installed Vulkan loader library. It selects a device reporting Qualcomm's
+vendor ID and Mesa's Turnip driver ID. Supply its 16-byte Vulkan device UUID when
+more than one matches. Missing extensions, ambiguous selection and unsupported
+formats/usages return an error; no GPU identity is inferred from a product name.
+
+`IsSupported` checks the actual external-image capabilities, image requirements
+and compatible memory types. `Allocate` creates a linear exportable image,
+allocates dedicated memory and obtains the real plane offsets/pitches through
+Vulkan. The exported DMA-BUF's actual capacity determines the handle capacity;
+plane regions include the driver's padding. The returned owned handle uses
+`FreeNativeBuffer`. Temporary Vulkan images and memory are released after export.
+
+CPU read/write, DMA, cached CPU memory and GPU render/texture/composer usage bits
+are accepted only when their queried format/memory requirements can be met.
+Protected, assigned-size, camera/video and unknown vendor usage bits require
+separate allocation contracts. This target provides allocation only. Mapping,
+fence ownership, CPU cache sessions and display scanout belong to their providers;
+allocation does not establish display-controller compatibility.
+
 ## Host checks
 
 Run outside the source tree with an explicit output path:
