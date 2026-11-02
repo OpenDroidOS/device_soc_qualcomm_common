@@ -1,0 +1,7 @@
+Qualcomm native platform support
+Copyright 2026 OpenDroidOS
+Apache-2.0; see LICENSE.
+
+Uses Linux DMA-buffer UAPI and OpenHarmony build interfaces.
+https://docs.kernel.org/userspace-api/dma-buf-heaps.html
+https://github.com/openharmony/build
