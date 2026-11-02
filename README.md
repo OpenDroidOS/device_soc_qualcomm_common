@@ -32,6 +32,31 @@ library. The GN target installs no display VDI implementation by itself.
 See the Linux [DMA-heap API](https://docs.kernel.org/userspace-api/dma-buf-heaps.html)
 and [DMA-buffer synchronization](https://docs.kernel.org/driver-api/dma-buf.html).
 
+## Native buffer handles
+
+Depend on `:native_buffer_export` and include `qcom/native_buffer_export.h` to
+export a `DmaBuffer` as an owned native HDI `BufferHandle`. Supply the dimensions,
+native format, usage and the layout calculated by the selected graphics backend.
+`ExportNativeBuffer` duplicates the fd; `FreeNativeBuffer` releases that returned
+handle. The backing buffer keeps its own descriptor. No physical address or CPU
+mapping is attached to the exported handle.
+
+`qcom/native_buffer.h` provides C-compatible layout readers for consumers. The
+handle uses the native HDI definition, not an incompatible public SDK window
+header. Its reserved integers contain a producer tag and layout version, DRM
+fourcc/modifier, allocation size and up to four planes in DRM format order.
+Offsets, row pitches and plane sizes are bytes; each 64-bit value uses low/high
+32-bit words. The transport uses one backing fd and no reserved fds. Bounds,
+format/stride agreement and non-overlapping plane regions are checked. Plane
+regions include any metadata required by the modifier. Unrecognized handles
+reject; there is no assumed linear layout for another allocator's buffers.
+
+The allocator must derive the actual modifier, pitch, offsets and capacity from
+its backend. Exporting a descriptor does not establish GPU or display capability.
+Consumers must validate the layout against their hardware, check the actual fd
+capacity and obey the existing fence/CPU-access ownership contract. The header
+dependency needs the native HDI, native-buffer format and DRM UAPI include paths.
+
 ## Host checks
 
 Run outside the source tree with an explicit output path:

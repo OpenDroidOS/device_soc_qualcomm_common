@@ -24,3 +24,23 @@ source_set("dma_heap") {
   public_configs = [ ":dma_heap_headers" ]
   cflags_cc = [ "-std=c++17" ]
 }
+
+config("native_buffer_headers") {
+  include_dirs = [
+    "include",
+    "//drivers/hdf_core/interfaces/inner_api/hdi/base",
+    "//interface/sdk_c/graphic/graphic_2d",
+    "//third_party/libdrm/include/drm",
+  ]
+}
+
+source_set("native_buffer_export") {
+  sources = [ "display/memory/native_buffer_export.cpp" ]
+  public = [
+    "include/qcom/native_buffer.h",
+    "include/qcom/native_buffer_export.h",
+  ]
+  public_configs = [ ":native_buffer_headers" ]
+  public_deps = [ ":dma_heap" ]
+  cflags_cc = [ "-std=c++17" ]
+}
