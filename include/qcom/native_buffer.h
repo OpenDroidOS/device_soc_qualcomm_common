@@ -29,8 +29,18 @@ _Static_assert(offsetof(BufferHandle, reserve) == 56, "Use the native HDI Buffer
  */
 #define QCOM_BUFFER_LAYOUT_MAGIC UINT32_C(0x51434d42)
 #define QCOM_BUFFER_LAYOUT_VERSION 1u
+#define QCOM_BUFFER_METADATA_VERSION 2u
 #define QCOM_BUFFER_MAX_PLANES 4u
 #define QCOM_BUFFER_LAYOUT_WORDS (8u + 6u * QCOM_BUFFER_MAX_PLANES)
+#define QCOM_BUFFER_METADATA_WORDS (QCOM_BUFFER_LAYOUT_WORDS + 6u)
+
+static inline const int32_t *qcom_buffer_layout_words(const BufferHandle *handle)
+{
+    if (!handle || !((handle->reserveFds == 0 && handle->reserveInts == QCOM_BUFFER_LAYOUT_WORDS) ||
+        (handle->reserveFds == 1 && handle->reserveInts == QCOM_BUFFER_METADATA_WORDS && handle->reserve[0] >= 0)))
+        return NULL;
+    return handle->reserve + handle->reserveFds;
+}
 
 struct QcomBufferPlane {
     uint64_t offset;
@@ -79,12 +89,47 @@ static inline void qcom_buffer_write_u64(int32_t *words, uint64_t value)
     memcpy(words + 1, &high, sizeof(high));
 }
 
+static inline int qcom_buffer_validate_linear_geometry(const BufferHandle *handle,
+                                                        const struct QcomBufferLayout *layout)
+{
+    uint32_t count = 1, bytes = 0;
+    switch (layout->drm_format) {
+        case DRM_FORMAT_ABGR8888: case DRM_FORMAT_ARGB8888:
+        case DRM_FORMAT_XBGR8888: case DRM_FORMAT_XRGB8888: case DRM_FORMAT_ABGR2101010: bytes = 4; break;
+        case DRM_FORMAT_RGB565: case DRM_FORMAT_BGR565: bytes = 2; break;
+        case DRM_FORMAT_BGR888: bytes = 3; break;
+        case DRM_FORMAT_ABGR16161616F: bytes = 8; break;
+        case DRM_FORMAT_NV12: case DRM_FORMAT_NV21: bytes = 1; count = 2; break;
+        case DRM_FORMAT_YUV420: case DRM_FORMAT_YVU420: bytes = 1; count = 3; break;
+        case DRM_FORMAT_P010: bytes = 2; count = 2; break;
+        default: return -EINVAL;
+    }
+    if (layout->plane_count != count)
+        return -EINVAL;
+    for (uint32_t i = 0; i < count; i++) {
+        uint64_t columns = (uint32_t)handle->width, rows = (uint32_t)handle->height;
+        uint32_t pixel_bytes = bytes;
+        if (i != 0) {
+            columns = (columns + 1) / 2;
+            rows = (rows + 1) / 2;
+            if (count == 2)
+                pixel_bytes *= 2;
+        }
+        uint64_t row_bytes = columns * pixel_bytes;
+        const struct QcomBufferPlane *plane = &layout->planes[i];
+        // Width/height and pitch are bounded signed 32-bit values; products fit u64.
+        if (row_bytes > plane->row_pitch || (rows - 1) * plane->row_pitch + row_bytes > plane->size)
+            return -EINVAL;
+    }
+    return 0;
+}
+
 static inline int qcom_buffer_validate_layout(const BufferHandle *handle,
                                               const struct QcomBufferLayout *layout)
 {
     if (!handle || !layout || handle->fd < 0 || handle->width <= 0 || handle->height <= 0 ||
-        handle->stride <= 0 || handle->size <= 0 || handle->reserveFds != 0 ||
-        handle->reserveInts != QCOM_BUFFER_LAYOUT_WORDS || layout->plane_count == 0 ||
+        handle->stride <= 0 || handle->size <= 0 || qcom_buffer_layout_words(handle) == NULL ||
+        layout->plane_count == 0 ||
         layout->plane_count > QCOM_BUFFER_MAX_PLANES ||
         layout->allocation_size != (uint64_t)handle->size ||
         layout->drm_format == 0 || layout->drm_format != qcom_native_format_to_drm(handle->format) ||
@@ -105,16 +150,17 @@ static inline int qcom_buffer_validate_layout(const BufferHandle *handle,
                 return -EINVAL;
         }
     }
-    return 0;
+    return layout->modifier == DRM_FORMAT_MOD_LINEAR ? qcom_buffer_validate_linear_geometry(handle, layout) : 0;
 }
 
 static inline int qcom_buffer_read_layout(const BufferHandle *handle, struct QcomBufferLayout *out)
 {
-    if (!handle || !out || handle->reserveFds != 0 || handle->reserveInts != QCOM_BUFFER_LAYOUT_WORDS)
+    const int32_t *words = qcom_buffer_layout_words(handle);
+    if (!words || !out)
         return -EINVAL;
-    const int32_t *words = handle->reserve;
     if ((uint32_t)words[0] != QCOM_BUFFER_LAYOUT_MAGIC ||
-        (uint32_t)words[1] != QCOM_BUFFER_LAYOUT_VERSION)
+        (uint32_t)words[1] != (handle->reserveFds == 0 ? QCOM_BUFFER_LAYOUT_VERSION : QCOM_BUFFER_METADATA_VERSION) ||
+        (handle->reserveFds == 1 && qcom_buffer_read_u64(words + QCOM_BUFFER_LAYOUT_WORDS + 4) == 0))
         return -EINVAL;
     struct QcomBufferLayout layout;
     memset(&layout, 0, sizeof(layout));
@@ -140,10 +186,10 @@ static inline int qcom_buffer_write_layout(BufferHandle *handle, const struct Qc
     int result = qcom_buffer_validate_layout(handle, layout);
     if (result != 0)
         return result;
-    int32_t *words = handle->reserve;
+    int32_t *words = handle->reserve + handle->reserveFds;
     memset(words, 0, QCOM_BUFFER_LAYOUT_WORDS * sizeof(*words));
     words[0] = (int32_t)QCOM_BUFFER_LAYOUT_MAGIC;
-    words[1] = QCOM_BUFFER_LAYOUT_VERSION;
+    words[1] = handle->reserveFds == 0 ? QCOM_BUFFER_LAYOUT_VERSION : QCOM_BUFFER_METADATA_VERSION;
     memcpy(words + 2, &layout->drm_format, sizeof(layout->drm_format));
     words[3] = (int32_t)layout->plane_count;
     qcom_buffer_write_u64(words + 4, layout->modifier);

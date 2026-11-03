@@ -1,0 +1,14 @@
+# Copyright 2026 OpenDroidOS
+# SPDX-License-Identifier: Apache-2.0
+
+declare_args() {
+  qcom_display_native_buffer = false
+  qcom_display_gpu_kmd = ""
+  qcom_display_meson_python = "python3"
+  qcom_display_glslang = "glslangValidator"
+  qcom_display_gpu_build_dir = ""
+}
+
+assert(qcom_display_gpu_kmd == "" || qcom_display_gpu_kmd == "kgsl" ||
+           qcom_display_gpu_kmd == "msm",
+       "Select the actual Qualcomm graphics kernel interface: kgsl or msm")

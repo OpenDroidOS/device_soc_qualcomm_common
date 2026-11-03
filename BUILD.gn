@@ -56,3 +56,11 @@ source_set("vulkan_buffer_allocator") {
   libs = [ "dl" ]
   cflags_cc = [ "-std=c++17" ]
 }
+
+source_set("native_buffer_metadata") {
+  sources = [ "display/memory/buffer_metadata.cpp" ]
+  public = [ "include/qcom/buffer_metadata.h" ]
+  public_deps = [ ":native_buffer_export" ]
+  include_dirs = [ "//foundation/graphic/graphic_surface/interfaces/inner_api/buffer_handle" ]
+  cflags_cc = [ "-std=c++17" ]
+}

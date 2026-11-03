@@ -1,0 +1,39 @@
+{
+  "name": "@opendroid/qcom_display",
+  "description": "Native Qualcomm display-buffer support",
+  "license": "Apache-2.0",
+  "component": {
+    "name": "qcom_display",
+    "subsystem": "hdf",
+    "features": [ "qcom_display_gpu_kmd", "qcom_display_native_buffer" ],
+    "adapted_system_type": [
+      "standard"
+    ],
+    "deps": {
+      "components": [
+        "drivers_interface_display",
+        "drivers_peripheral_display",
+        "graphic_2d",
+        "graphic_surface",
+        "hdf_core",
+        "hilog",
+        "hitrace",
+        "init",
+        "qos_manager",
+        "vulkan-loader"
+      ],
+      "third_party": [
+        "libdrm",
+        "vulkan-headers",
+        "mesa3d",
+        "expat",
+        "zlib"
+      ]
+    },
+    "build": {
+      "sub_component": [
+        "//device/soc/qualcomm/common/display:display"
+      ]
+    }
+  }
+}

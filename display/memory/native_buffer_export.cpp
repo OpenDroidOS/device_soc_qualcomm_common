@@ -51,6 +51,8 @@ void FreeNativeBuffer(BufferHandle* handle) noexcept
         return;
     if (handle->fd >= 0)
         close(handle->fd);
+    if (handle->reserveFds == 1 && handle->reserve[0] >= 0)
+        close(handle->reserve[0]);
     std::free(handle);
 }
 

@@ -1,0 +1,115 @@
+# Copyright 2026 OpenDroidOS
+# SPDX-License-Identifier: Apache-2.0
+import("//build/ohos.gni")
+import("//third_party/mesa3d/dependency_inputs.gni")
+import("../config.gni")
+
+assert(current_cpu == "arm64", "Native Turnip integration requires AArch64")
+assert(qcom_display_gpu_kmd != "", "Select kgsl or msm for the product kernel")
+assert(!is_asan && !use_clang_coverage,
+       "Turnip sanitizer and coverage builds require matching native compiler flags")
+
+_output = "$target_gen_dir/turnip"
+_metadata = get_label_info("../buffer:buffer_metadata", "target_out_dir") +
+            "/libbuffer_metadata.a"
+
+action("build_turnip") {
+  script = "//third_party/mesa3d/ohos/build_turnip.py"
+  inputs = []
+  foreach(path, deps_inputs) {
+    inputs += [ "//third_party/mesa3d/$path" ]
+  }
+  inputs += [ _metadata ]
+  outputs = [
+    "$_output/libvulkan_freedreno.so",
+    "$_output/freedreno_icd.json",
+    "$_output/build-result.json",
+  ]
+  deps = [ "../buffer:buffer_metadata" ]
+  external_deps = [
+    "expat:expat",
+    "hilog:libhilog",
+    "hitrace:hitrace_meter",
+    "init:libbegetutil",
+    "qos_manager:qos",
+    "zlib:libz",
+  ]
+  args = [
+    "--source-root=" + rebase_path("//", root_build_dir),
+    "--output=" + rebase_path(_output, root_build_dir),
+    "--metadata-archive=" + rebase_path(_metadata, root_build_dir),
+    "--kernel-driver=$qcom_display_gpu_kmd",
+    "--sysroot=" + rebase_path("//out/sdk/sdk-native/os-irrelevant/sysroot",
+                               root_build_dir),
+    "--llvm=" + rebase_path("//prebuilts/clang/ohos/linux-x86_64/llvm",
+                            root_build_dir),
+    "--python=$qcom_display_meson_python",
+    "--glslang=$qcom_display_glslang",
+    "--ninja=" + rebase_path("//prebuilts/build-tools/linux-x86/bin/ninja",
+                             root_build_dir),
+    "--jobs=16",
+    "--library=zlib=" + rebase_path("$root_out_dir/obj/third_party/zlib/libz.a",
+                                    root_build_dir),
+    "--library=expat=" + rebase_path("$root_out_dir/thirdparty/expat/libexpat.z.so",
+                                     root_build_dir),
+    "--library=libhilog=" + rebase_path("$root_out_dir/hiviewdfx/hilog/libhilog.so",
+                                        root_build_dir),
+    "--library=libhitrace=" +
+        rebase_path("$root_out_dir/hiviewdfx/hitrace/libhitrace_meter.so",
+                    root_build_dir),
+    "--library=libbegetutil=" +
+        rebase_path("$root_out_dir/startup/init/libbegetutil.z.so", root_build_dir),
+    "--library=libqos=" +
+        rebase_path("$root_out_dir/resourceschedule/qos_manager/libqos.so",
+                    root_build_dir),
+  ]
+  if (is_debug) {
+    args += [ "--build-type=debug" ]
+  } else {
+    args += [ "--build-type=release" ]
+  }
+  if (qcom_display_native_buffer) {
+    args += [ "--native-buffer" ]
+  }
+  if (qcom_display_gpu_build_dir != "") {
+    args += [ "--build-dir=" +
+              rebase_path(qcom_display_gpu_build_dir, root_build_dir) ]
+  }
+  if (qcom_display_gpu_kmd == "msm") {
+    external_deps += [ "libdrm:libdrm" ]
+    args += [ "--library=libdrm=" +
+              rebase_path("$root_out_dir/thirdparty/libdrm/libdrm.so",
+                          root_build_dir) ]
+  }
+}
+
+ohos_prebuilt_shared_library("turnip_driver") {
+  source = "$_output/libvulkan_freedreno.so"
+  output = "libvulkan_freedreno.so"
+  module_install_dir = "lib64"
+  install_images = [ "vendor" ]
+  install_enable = qcom_display_native_buffer
+  deps = [ ":build_turnip" ]
+  license_file = "//third_party/mesa3d/docs/license.rst"
+  subsystem_name = "hdf"
+  part_name = "qcom_display"
+}
+
+ohos_prebuilt_etc("turnip_icd") {
+  source = "$_output/freedreno_icd.json"
+  output = "freedreno_icd.json"
+  relative_install_dir = "vulkan/icd.d"
+  install_images = [ "vendor" ]
+  install_enable = qcom_display_native_buffer
+  deps = [ ":build_turnip" ]
+  license_file = "//third_party/mesa3d/docs/license.rst"
+  subsystem_name = "hdf"
+  part_name = "qcom_display"
+}
+
+group("turnip") {
+  deps = [
+    ":turnip_driver",
+    ":turnip_icd",
+  ]
+}
