@@ -4,16 +4,23 @@ import("config.gni")
 
 if (qcom_display_native_buffer) {
   import("//drivers/peripheral/display/display_config.gni")
-  assert(qcom_display_gpu_kmd != "",
-         "Native display buffers require an explicit kgsl or msm kernel interface")
+  assert(
+      qcom_display_gpu_kmd != "",
+      "Native display buffers require an explicit kgsl or msm kernel interface")
   assert(!drivers_peripheral_display_vdi_default,
          "Select the native vendor VDI instead of the generic default VDI")
 }
+
+assert(!qcom_display_egl || qcom_display_native_buffer,
+       "Native EGL requires the paired native allocator and Vulkan provider")
 
 group("display") {
   deps = [ "buffer:display_buffer_vdi_impl" ]
   if (qcom_display_gpu_kmd != "") {
     deps += [ "renderer:turnip" ]
+  }
+  if (qcom_display_egl) {
+    deps += [ "renderer:zink" ]
   }
   if (qcom_display_native_buffer) {
     deps += [

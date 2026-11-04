@@ -5,7 +5,11 @@
   "component": {
     "name": "qcom_display",
     "subsystem": "hdf",
-    "features": [ "qcom_display_gpu_kmd", "qcom_display_native_buffer" ],
+    "features": [
+      "qcom_display_gpu_kmd",
+      "qcom_display_native_buffer",
+      "qcom_display_egl"
+    ],
     "adapted_system_type": [
       "standard"
     ],

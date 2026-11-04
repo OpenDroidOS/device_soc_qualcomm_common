@@ -6,8 +6,9 @@ import("../config.gni")
 
 assert(current_cpu == "arm64", "Native Turnip integration requires AArch64")
 assert(qcom_display_gpu_kmd != "", "Select kgsl or msm for the product kernel")
-assert(!is_asan && !use_clang_coverage,
-       "Turnip sanitizer and coverage builds require matching native compiler flags")
+assert(
+    !is_asan && !use_clang_coverage,
+    "Turnip sanitizer and coverage builds require matching native compiler flags")
 
 _output = "$target_gen_dir/turnip"
 _metadata = get_label_info("../buffer:buffer_metadata", "target_out_dir") +
@@ -41,8 +42,8 @@ action("build_turnip") {
     "--kernel-driver=$qcom_display_gpu_kmd",
     "--sysroot=" + rebase_path("//out/sdk/sdk-native/os-irrelevant/sysroot",
                                root_build_dir),
-    "--llvm=" + rebase_path("//prebuilts/clang/ohos/linux-x86_64/llvm",
-                            root_build_dir),
+    "--llvm=" +
+        rebase_path("//prebuilts/clang/ohos/linux-x86_64/llvm", root_build_dir),
     "--python=$qcom_display_meson_python",
     "--glslang=$qcom_display_glslang",
     "--ninja=" + rebase_path("//prebuilts/build-tools/linux-x86/bin/ninja",
@@ -50,15 +51,18 @@ action("build_turnip") {
     "--jobs=16",
     "--library=zlib=" + rebase_path("$root_out_dir/obj/third_party/zlib/libz.a",
                                     root_build_dir),
-    "--library=expat=" + rebase_path("$root_out_dir/thirdparty/expat/libexpat.z.so",
-                                     root_build_dir),
-    "--library=libhilog=" + rebase_path("$root_out_dir/hiviewdfx/hilog/libhilog.so",
-                                        root_build_dir),
+    "--library=expat=" +
+        rebase_path("$root_out_dir/thirdparty/expat/libexpat.z.so",
+                    root_build_dir),
+    "--library=libhilog=" +
+        rebase_path("$root_out_dir/hiviewdfx/hilog/libhilog.so",
+                    root_build_dir),
     "--library=libhitrace=" +
         rebase_path("$root_out_dir/hiviewdfx/hitrace/libhitrace_meter.so",
                     root_build_dir),
     "--library=libbegetutil=" +
-        rebase_path("$root_out_dir/startup/init/libbegetutil.z.so", root_build_dir),
+        rebase_path("$root_out_dir/startup/init/libbegetutil.z.so",
+                    root_build_dir),
     "--library=libqos=" +
         rebase_path("$root_out_dir/resourceschedule/qos_manager/libqos.so",
                     root_build_dir),
@@ -112,4 +116,130 @@ group("turnip") {
     ":turnip_driver",
     ":turnip_icd",
   ]
+}
+
+if (qcom_display_egl) {
+  _egl_output = "$target_gen_dir/zink"
+
+  action("build_zink") {
+    script = "//third_party/mesa3d/ohos/build_zink.py"
+    inputs = []
+    foreach(path, deps_inputs) {
+      inputs += [ "//third_party/mesa3d/$path" ]
+    }
+    inputs += [
+      _metadata,
+      "//third_party/mesa3d/ohos/build_turnip.py",
+      "//third_party/mesa3d/src/egl/drivers/dri2/platform_ohos_buffer.cpp",
+      "//third_party/mesa3d/src/egl/drivers/dri2/platform_ohos_buffer.h",
+    ]
+    outputs = [
+      "$_egl_output/libEGL_impl.so",
+      "$_egl_output/libGLESv1_impl.so",
+      "$_egl_output/libGLESv2_impl.so",
+      "$_egl_output/libGLESv3_impl.so",
+      "$_egl_output/libgallium_dri.so",
+      "$_egl_output/00-mesa-defaults.conf",
+      "$_egl_output/build-result.json",
+    ]
+    deps = [ "../buffer:buffer_metadata" ]
+    external_deps = [
+      "expat:expat",
+      "graphic_surface:surface",
+      "hilog:libhilog",
+      "hitrace:hitrace_meter",
+      "init:libbegetutil",
+      "libdrm:libdrm",
+      "qos_manager:qos",
+      "zlib:libz",
+    ]
+    args = [
+      "--source-root=" + rebase_path("//", root_build_dir),
+      "--output=" + rebase_path(_egl_output, root_build_dir),
+      "--metadata-archive=" + rebase_path(_metadata, root_build_dir),
+      "--sysroot=" + rebase_path("//out/sdk/sdk-native/os-irrelevant/sysroot",
+                                 root_build_dir),
+      "--llvm=" + rebase_path("//prebuilts/clang/ohos/linux-x86_64/llvm",
+                              root_build_dir),
+      "--python=$qcom_display_meson_python",
+      "--ninja=" + rebase_path("//prebuilts/build-tools/linux-x86/bin/ninja",
+                               root_build_dir),
+      "--jobs=16",
+      "--library=zlib=" +
+          rebase_path("$root_out_dir/obj/third_party/zlib/libz.a",
+                      root_build_dir),
+      "--library=expat=" +
+          rebase_path("$root_out_dir/thirdparty/expat/libexpat.z.so",
+                      root_build_dir),
+      "--library=libsurface=" +
+          rebase_path("$root_out_dir/graphic/graphic_surface/libsurface.z.so",
+                      root_build_dir),
+      "--library=libhilog=" +
+          rebase_path("$root_out_dir/hiviewdfx/hilog/libhilog.so",
+                      root_build_dir),
+      "--library=libhitrace=" +
+          rebase_path("$root_out_dir/hiviewdfx/hitrace/libhitrace_meter.so",
+                      root_build_dir),
+      "--library=libbegetutil=" +
+          rebase_path("$root_out_dir/startup/init/libbegetutil.z.so",
+                      root_build_dir),
+      "--library=libqos=" +
+          rebase_path("$root_out_dir/resourceschedule/qos_manager/libqos.so",
+                      root_build_dir),
+      "--library=libdrm=" +
+          rebase_path("$root_out_dir/thirdparty/libdrm/libdrm.so",
+                      root_build_dir),
+    ]
+    if (is_debug) {
+      args += [ "--build-type=debug" ]
+    } else {
+      args += [ "--build-type=release" ]
+    }
+    if (qcom_display_egl_build_dir != "") {
+      args += [ "--build-dir=" +
+                rebase_path(qcom_display_egl_build_dir, root_build_dir) ]
+    }
+  }
+
+  foreach(api,
+          [
+            "EGL_impl",
+            "GLESv1_impl",
+            "GLESv2_impl",
+            "GLESv3_impl",
+            "gallium_dri",
+          ]) {
+    ohos_prebuilt_shared_library(api) {
+      source = "$_egl_output/lib$api.so"
+      output = "lib$api.so"
+      module_install_dir = "lib64"
+      install_images = [ "vendor" ]
+      deps = [ ":build_zink" ]
+      license_file = "//third_party/mesa3d/docs/license.rst"
+      subsystem_name = "hdf"
+      part_name = "qcom_display"
+    }
+  }
+
+  ohos_prebuilt_etc("mesa_defaults") {
+    source = "$_egl_output/00-mesa-defaults.conf"
+    output = "00-mesa-defaults.conf"
+    relative_install_dir = "drirc.d"
+    install_images = [ "vendor" ]
+    deps = [ ":build_zink" ]
+    license_file = "//third_party/mesa3d/docs/license.rst"
+    subsystem_name = "hdf"
+    part_name = "qcom_display"
+  }
+
+  group("zink") {
+    deps = [
+      ":EGL_impl",
+      ":GLESv1_impl",
+      ":GLESv2_impl",
+      ":GLESv3_impl",
+      ":gallium_dri",
+      ":mesa_defaults",
+    ]
+  }
 }

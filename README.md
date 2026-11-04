@@ -147,6 +147,27 @@ disable flag or direct ICD loading is needed. The loader discovers the generated
 ICD under `/vendor/etc/vulkan/icd.d`. This buffer/renderer pair does not supply
 a display composer, prove a GPU is supported, or replace kernel/firmware checks.
 
+## Native EGL/GLES product build
+
+Select `qcom_display_egl = true` together with the native buffer pair to build
+and install Mesa EGL/Zink and its GLES clients for the native graphics wrapper.
+The action uses the actual product Surface, libdrm and metadata archive, and
+requires the same native SDK and host Meson tools as Turnip. An explicit
+`qcom_display_egl_build_dir` can reuse an EGL cache after compiler/target/sysroot
+validation. The action preserves incremental output and runs at most sixteen
+jobs.
+
+Only Meson's installed runtime libraries are packaged; host build search paths
+must be removed by its install step. The GLES1 client supplies the wrapper's
+`libGLESv1_impl.so` name. The genuine Mesa GLES2+3 client supplies both
+`libGLESv2_impl.so` and `libGLESv3_impl.so`; these are aliases of one implementation,
+not Vulkan libraries labeled as GLES. The common Gallium library and default
+configuration are installed alongside them. See Mesa's `docs/ohos.rst` for native
+image formats, descriptor ownership and per-use CPU/fence synchronization.
+
+Selecting this renderer does not implement the display composer or establish
+GPU, kernel/module/firmware, namespace or actual display compatibility.
+
 ## Host checks
 
 Run outside the source tree with an explicit output path:

@@ -3,6 +3,8 @@
 
 declare_args() {
   qcom_display_native_buffer = false
+  qcom_display_egl = false
+  qcom_display_egl_build_dir = ""
   qcom_display_gpu_kmd = ""
   qcom_display_meson_python = "python3"
   qcom_display_glslang = "glslangValidator"
